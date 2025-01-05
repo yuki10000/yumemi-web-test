@@ -14,6 +14,18 @@
           {{ pref.prefName }}
         </label>
       </div>
+
+      <div class="buttons">
+        <button
+          v-for="type in populationTypes"
+          :key="type.key"
+          :class="{ active: selectedType === type.key }"
+          @click="changePopulationType(type.key)"
+        >
+          {{ type.label }}
+        </button>
+      </div>
+
       <highcharts :options="chartOptions"></highcharts>
     </div>
   </div>
@@ -50,7 +62,6 @@ interface FinalData {
 
 export default defineComponent({
   name: 'PopulationChart',
-  components: {},
   setup() {
     Highcharts.setOptions({
       lang: {
@@ -58,7 +69,7 @@ export default defineComponent({
         thousandsSep: ',',
       },
     })
-    // データ
+
     const chartOptions = ref({
       chart: {
         type: 'line',
@@ -82,10 +93,21 @@ export default defineComponent({
 
     const prefectureList = ref<Prefecture[]>([])
     const finalData = ref<FinalData[]>([])
+    const selectedPrefectures = ref<Set<number>>(new Set())
     const loading = ref(true)
     const error = ref<string | null>(null)
+    const selectedType = ref<'total' | 'young' | 'working' | 'old'>('total')
 
-    // 都道府県データを取得
+    const populationTypes: {
+      key: 'total' | 'young' | 'working' | 'old'
+      label: string
+    }[] = [
+      { key: 'total', label: '総人口' },
+      { key: 'young', label: '年少人口' },
+      { key: 'working', label: '生産年齢人口' },
+      { key: 'old', label: '老年人口' },
+    ]
+
     const fetchPrefectureData = async (): Promise<void> => {
       try {
         const response = await axios.get<{ result: Prefecture[] }>(
@@ -103,7 +125,6 @@ export default defineComponent({
       }
     }
 
-    // 人口構成データを取得
     const fetchPopulationCompositionData = async (
       prefCode: number,
     ): Promise<PopulationComposition> => {
@@ -124,7 +145,6 @@ export default defineComponent({
       }
     }
 
-    // すべての人口構成データを取得
     const fetchAllPopulationCompositionData = async (): Promise<void> => {
       const promises = prefectureList.value.map(async (pref) => {
         const populationData = await fetchPopulationCompositionData(
@@ -145,28 +165,38 @@ export default defineComponent({
       finalData.value = await Promise.all(promises)
     }
 
-    // チェックボックスの切り替え処理
     const togglePrefecture = (pref: FinalData) => {
-      if (!pref.total) return
-
-      const seriesIndex = chartOptions.value.series.findIndex(
-        (series) => series.name === pref.prefName,
-      )
-
-      if (seriesIndex !== -1) {
-        // 該当のシリーズを削除
-        chartOptions.value.series.splice(seriesIndex, 1)
+      if (selectedPrefectures.value.has(pref.prefCode)) {
+        selectedPrefectures.value.delete(pref.prefCode)
       } else {
-        // 新しいシリーズを追加
-        chartOptions.value.series.push({
-          type: 'line',
-          name: pref.prefName,
-          data: pref.total.data.map((item) => [item.year, item.value]),
-        })
+        selectedPrefectures.value.add(pref.prefCode)
       }
+      updateChartSeries()
     }
 
-    // 初期化
+    const updateChartSeries = () => {
+      chartOptions.value.series = Array.from(selectedPrefectures.value)
+        .map((prefCode) => {
+          const pref = finalData.value.find((p) => p.prefCode === prefCode)
+          if (!pref) return null
+          const typeData = pref[selectedType.value]
+          if (!typeData) return null
+          return {
+            type: 'line',
+            name: pref.prefName,
+            data: typeData.data.map((item) => [item.year, item.value]),
+          }
+        })
+        .filter((series) => series !== null) as Highcharts.SeriesOptionsType[]
+    }
+
+    const changePopulationType = (
+      type: 'total' | 'young' | 'working' | 'old',
+    ) => {
+      selectedType.value = type
+      updateChartSeries() // チェックされている都道府県のデータを切り替え
+    }
+
     const init = async () => {
       try {
         await fetchPrefectureData()
@@ -184,14 +214,34 @@ export default defineComponent({
       chartOptions,
       prefectureList,
       finalData,
+      selectedPrefectures,
       loading,
       error,
       togglePrefecture,
+      selectedType,
+      changePopulationType,
+      populationTypes,
     }
   },
 })
 </script>
 
 <style scoped>
-/* 必要に応じてスタイルを追加 */
+.buttons {
+  margin-bottom: 20px;
+}
+
+button {
+  margin-right: 10px;
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+  cursor: pointer;
+}
+
+button.active {
+  background-color: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
 </style>
