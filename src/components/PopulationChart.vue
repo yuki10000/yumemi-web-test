@@ -22,7 +22,6 @@
 <script lang="ts">
 import { defineComponent, ref } from 'vue'
 import axios from 'axios'
-import HighchartsVue from 'highcharts-vue'
 import Highcharts from 'highcharts'
 
 interface Prefecture {
