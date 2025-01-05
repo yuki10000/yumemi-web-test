@@ -1,19 +1,28 @@
 <template>
   <div>
-    <div>This is a population chart</div>
-    <div>{{ msg }}</div>
     <div v-if="loading">Loading...</div>
     <div v-else-if="error">{{ error }}</div>
     <div v-else>
-      <!-- <pre>{{ JSON.stringify(finalData, null, 2) }}</pre> -->
-      Successfully fetched data
+      <h3>Select Prefectures</h3>
+      <div v-for="pref in finalData" :key="pref.prefCode">
+        <label>
+          <input
+            type="checkbox"
+            :value="pref.prefCode"
+            @change="togglePrefecture(pref)"
+          />
+          {{ pref.prefName }}
+        </label>
+      </div>
+      <highcharts :options="chartOptions"></highcharts>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, ref } from 'vue'
 import axios from 'axios'
+import Highcharts from 'highcharts'
 
 interface Prefecture {
   prefCode: number
@@ -41,33 +50,43 @@ interface FinalData {
 
 export default defineComponent({
   name: 'PopulationChart',
-  props: {
-    msg: {
-      type: String,
-      required: true,
-    },
-  },
-  data() {
-    return {
-      prefectureList: [] as Prefecture[],
-      finalData: [] as FinalData[],
-      loading: true,
-      error: null as string | null,
-    }
-  },
-  async mounted() {
-    try {
-      await this.fetchPrefectureData()
-      await this.fetchAllPopulationCompositionData()
-    } catch (error) {
-      this.error = 'Failed to fetch data'
-    } finally {
-      this.loading = false
-      console.log(this.finalData)
-    }
-  },
-  methods: {
-    async fetchPrefectureData(): Promise<void> {
+  components: {},
+  setup() {
+    Highcharts.setOptions({
+      lang: {
+        decimalPoint: '.',
+        thousandsSep: ',',
+      },
+    })
+    // データ
+    const chartOptions = ref({
+      chart: {
+        type: 'line',
+      },
+      title: {
+        text: 'Population Trends',
+      },
+      xAxis: {
+        title: {
+          text: 'Year',
+        },
+        type: 'linear',
+      },
+      yAxis: {
+        title: {
+          text: 'Population',
+        },
+      },
+      series: [] as Highcharts.SeriesOptionsType[],
+    })
+
+    const prefectureList = ref<Prefecture[]>([])
+    const finalData = ref<FinalData[]>([])
+    const loading = ref(true)
+    const error = ref<string | null>(null)
+
+    // 都道府県データを取得
+    const fetchPrefectureData = async (): Promise<void> => {
       try {
         const response = await axios.get<{ result: Prefecture[] }>(
           'https://yumemi-frontend-engineer-codecheck-api.vercel.app/api/v1/prefectures',
@@ -77,15 +96,17 @@ export default defineComponent({
             },
           },
         )
-        this.prefectureList = response.data.result
-      } catch (error) {
-        this.error = 'Failed to fetch prefecture data'
-        throw error
+        prefectureList.value = response.data.result
+      } catch {
+        error.value = 'Failed to fetch prefecture data'
+        throw new Error(error.value)
       }
-    },
-    async fetchPopulationCompositionData(
+    }
+
+    // 人口構成データを取得
+    const fetchPopulationCompositionData = async (
       prefCode: number,
-    ): Promise<PopulationComposition> {
+    ): Promise<PopulationComposition> => {
       try {
         const response = await axios.get<{ result: PopulationComposition }>(
           'https://yumemi-frontend-engineer-codecheck-api.vercel.app/api/v1/population/composition/perYear',
@@ -97,14 +118,16 @@ export default defineComponent({
           },
         )
         return response.data.result
-      } catch (error) {
-        this.error = `Failed to fetch population composition data for prefCode ${prefCode}`
-        throw error
+      } catch {
+        error.value = `Failed to fetch population composition data for prefCode ${prefCode}`
+        throw new Error(error.value)
       }
-    },
-    async fetchAllPopulationCompositionData(): Promise<void> {
-      const promises = this.prefectureList.map(async (pref) => {
-        const populationData = await this.fetchPopulationCompositionData(
+    }
+
+    // すべての人口構成データを取得
+    const fetchAllPopulationCompositionData = async (): Promise<void> => {
+      const promises = prefectureList.value.map(async (pref) => {
+        const populationData = await fetchPopulationCompositionData(
           pref.prefCode,
         )
         return {
@@ -119,10 +142,56 @@ export default defineComponent({
         }
       })
 
-      this.finalData = await Promise.all(promises)
-    },
+      finalData.value = await Promise.all(promises)
+    }
+
+    // チェックボックスの切り替え処理
+    const togglePrefecture = (pref: FinalData) => {
+      if (!pref.total) return
+
+      const seriesIndex = chartOptions.value.series.findIndex(
+        (series) => series.name === pref.prefName,
+      )
+
+      if (seriesIndex !== -1) {
+        // 該当のシリーズを削除
+        chartOptions.value.series.splice(seriesIndex, 1)
+      } else {
+        // 新しいシリーズを追加
+        chartOptions.value.series.push({
+          type: 'line',
+          name: pref.prefName,
+          data: pref.total.data.map((item) => [item.year, item.value]),
+        })
+      }
+    }
+
+    // 初期化
+    const init = async () => {
+      try {
+        await fetchPrefectureData()
+        await fetchAllPopulationCompositionData()
+      } catch (e) {
+        console.error(e)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    init()
+
+    return {
+      chartOptions,
+      prefectureList,
+      finalData,
+      loading,
+      error,
+      togglePrefecture,
+    }
   },
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+/* 必要に応じてスタイルを追加 */
+</style>
