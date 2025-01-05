@@ -1,7 +1,6 @@
 <template>
   <div>
     <div>This is a population chart</div>
-    <div>{{ msg }}</div>
     <div v-if="loading">Loading...</div>
     <div v-else-if="error">{{ error }}</div>
     <div v-else>
@@ -41,12 +40,6 @@ interface FinalData {
 
 export default defineComponent({
   name: 'PopulationChart',
-  props: {
-    msg: {
-      type: String,
-      required: true,
-    },
-  },
   data() {
     return {
       prefectureList: [] as Prefecture[],

@@ -1,7 +1,7 @@
 <template>
   <div class="home">
-    <h1>Home</h1>
-    <PopulationChart msg="Population data will be displayed here" />
+    <h1>都道府県別人口推移グラフ</h1>
+    <PopulationChart />
   </div>
 </template>
 
