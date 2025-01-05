@@ -51,10 +51,14 @@ interface FinalData {
 
 export default defineComponent({
   name: 'PopulationChart',
-  components: {
-    highcharts: HighchartsVue.HighchartsVue, // HighchartsVue の登録
-  },
+  components: {},
   setup() {
+    Highcharts.setOptions({
+      lang: {
+        decimalPoint: '.',
+        thousandsSep: ',',
+      },
+    })
     // データ
     const chartOptions = ref({
       chart: {
