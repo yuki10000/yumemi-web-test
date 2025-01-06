@@ -1,11 +1,16 @@
 <template>
   <div>
+    <!-- データ読み込み中に「Loading...」を表示 -->
     <div v-if="loading">Loading...</div>
+    <!-- エラーが発生した場合、エラーメッセージを表示 -->
     <div v-else-if="error">{{ error }}</div>
+    <!-- データが正常に読み込まれた場合のコンテンツ -->
     <div v-else>
+      <!-- 都道府県選択セクション -->
       <h3>都道府県を選択してください</h3>
       <div class="checkbox-container">
         <div v-for="pref in finalData" :key="pref.prefCode">
+          <!-- 都道府県ごとのチェックボックス -->
           <label>
             <input
               type="checkbox"
@@ -13,10 +18,12 @@
               @change="togglePrefecture(pref)"
             />
             {{ pref.prefName }}
+            <!-- 都道府県名を表示 -->
           </label>
         </div>
       </div>
 
+      <!-- 人口種類選択セクション -->
       <h3>人口の種類を選択してください</h3>
       <div class="buttons">
         <button
@@ -29,6 +36,7 @@
         </button>
       </div>
 
+      <!-- チャート表示部分 -->
       <highcharts :options="chartOptions"></highcharts>
     </div>
   </div>
@@ -39,21 +47,25 @@ import { defineComponent, ref } from 'vue'
 import axios from 'axios'
 import Highcharts from 'highcharts'
 
+// 都道府県データのインターフェース
 interface Prefecture {
   prefCode: number
   prefName: string
 }
 
+// 人口データのインターフェース
 interface PopulationData {
   label: string
   data: Array<{ year: number; value: number }>
 }
 
+// 人口構成データのインターフェース
 interface PopulationComposition {
   boundaryYear: number
   data: PopulationData[]
 }
 
+// 最終データのインターフェース
 interface FinalData {
   prefCode: number
   prefName: string
@@ -66,41 +78,50 @@ interface FinalData {
 export default defineComponent({
   name: 'PopulationChart',
   setup() {
+    // Highchartsの初期設定
     Highcharts.setOptions({
       lang: {
-        decimalPoint: '.',
-        thousandsSep: ',',
+        decimalPoint: '.', // 小数点の形式
+        thousandsSep: ',', // 3桁区切りのセパレーター
       },
     })
 
+    // チャートのオプション
     const chartOptions = ref({
       chart: {
-        type: 'line',
+        type: 'line', // 折れ線線グラフの指定
       },
       title: {
-        text: '人口推移',
+        text: '人口推移', // チャートタイトル
       },
       xAxis: {
         title: {
-          text: 'Year',
+          text: '年', // X軸のラベル
         },
         type: 'linear',
       },
       yAxis: {
         title: {
-          text: 'Population',
+          text: '人口', // Y軸のラベル
         },
       },
-      series: [] as Highcharts.SeriesOptionsType[],
+      series: [] as Highcharts.SeriesOptionsType[], // データシリーズ
     })
 
+    // 都道府県リスト
     const prefectureList = ref<Prefecture[]>([])
+    // 最終データ
     const finalData = ref<FinalData[]>([])
+    // 選択された都道府県のセット
     const selectedPrefectures = ref<Set<number>>(new Set())
+    // 読み込み中フラグ
     const loading = ref(true)
+    // エラーメッセージ
     const error = ref<string | null>(null)
+    // 選択された人口種類
     const selectedType = ref<'total' | 'young' | 'working' | 'old'>('total')
 
+    // 人口種類の定義
     const populationTypes: {
       key: 'total' | 'young' | 'working' | 'old'
       label: string
@@ -111,6 +132,7 @@ export default defineComponent({
       { key: 'old', label: '老年人口' },
     ]
 
+    // 都道府県データを取得する非同期関数
     const fetchPrefectureData = async (): Promise<void> => {
       try {
         const response = await axios.get<{ result: Prefecture[] }>(
@@ -121,13 +143,14 @@ export default defineComponent({
             },
           },
         )
-        prefectureList.value = response.data.result
+        prefectureList.value = response.data.result // データをprefectureListに格納
       } catch {
-        error.value = 'Failed to fetch prefecture data'
+        error.value = 'Failed to fetch prefecture data' // エラー時のメッセージ
         throw new Error(error.value)
       }
     }
 
+    // 人口構成データを取得する非同期関数
     const fetchPopulationCompositionData = async (
       prefCode: number,
     ): Promise<PopulationComposition> => {
@@ -138,7 +161,7 @@ export default defineComponent({
             headers: {
               'X-API-KEY': '8FzX5qLmN3wRtKjH7vCyP9bGdEaU4sYpT6cMfZnJ',
             },
-            params: { prefCode },
+            params: { prefCode }, // 都道府県コードを指定
           },
         )
         return response.data.result
@@ -148,6 +171,7 @@ export default defineComponent({
       }
     }
 
+    // すべての人口構成データを取得する非同期関数
     const fetchAllPopulationCompositionData = async (): Promise<void> => {
       const promises = prefectureList.value.map(async (pref) => {
         const populationData = await fetchPopulationCompositionData(
@@ -165,18 +189,20 @@ export default defineComponent({
         }
       })
 
-      finalData.value = await Promise.all(promises)
+      finalData.value = await Promise.all(promises) // すべてのデータをまとめて格納
     }
 
+    // 都道府県の選択状態を切り替える関数
     const togglePrefecture = (pref: FinalData) => {
       if (selectedPrefectures.value.has(pref.prefCode)) {
-        selectedPrefectures.value.delete(pref.prefCode)
+        selectedPrefectures.value.delete(pref.prefCode) // 選択解除
       } else {
-        selectedPrefectures.value.add(pref.prefCode)
+        selectedPrefectures.value.add(pref.prefCode) // 選択追加
       }
-      updateChartSeries()
+      updateChartSeries() // チャートを更新
     }
 
+    // チャートのシリーズデータを更新する関数
     const updateChartSeries = () => {
       chartOptions.value.series = Array.from(selectedPrefectures.value)
         .map((prefCode) => {
@@ -187,19 +213,21 @@ export default defineComponent({
           return {
             type: 'line',
             name: pref.prefName,
-            data: typeData.data.map((item) => [item.year, item.value]),
+            data: typeData.data.map((item) => [item.year, item.value]), // 年と値をマッピング
           }
         })
         .filter((series) => series !== null) as Highcharts.SeriesOptionsType[]
     }
 
+    // 人口種類を切り替える関数
     const changePopulationType = (
       type: 'total' | 'young' | 'working' | 'old',
     ) => {
-      selectedType.value = type
-      updateChartSeries() // チェックされている都道府県のデータを切り替え
+      selectedType.value = type // 人口種類を変更
+      updateChartSeries() // チャートを更新
     }
 
+    // 初期化処理
     const init = async () => {
       try {
         await fetchPrefectureData()
@@ -207,12 +235,13 @@ export default defineComponent({
       } catch (e) {
         console.error(e)
       } finally {
-        loading.value = false
+        loading.value = false // 読み込み終了
       }
     }
 
-    init()
+    init() // 初期化処理の実行
 
+    // テンプレートで使用するデータと関数を返却
     return {
       chartOptions,
       prefectureList,
@@ -231,10 +260,10 @@ export default defineComponent({
 
 <style scoped>
 .checkbox-container {
-  display: flex;
+  display: flex; /* チェックボックスを横並びに配置 */
   justify-content: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 10px; /* 要素間の余白 */
   margin: 30px;
 }
 .buttons {
