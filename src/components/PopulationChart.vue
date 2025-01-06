@@ -3,18 +3,21 @@
     <div v-if="loading">Loading...</div>
     <div v-else-if="error">{{ error }}</div>
     <div v-else>
-      <h3>Select Prefectures</h3>
-      <div v-for="pref in finalData" :key="pref.prefCode">
-        <label>
-          <input
-            type="checkbox"
-            :value="pref.prefCode"
-            @change="togglePrefecture(pref)"
-          />
-          {{ pref.prefName }}
-        </label>
+      <h3>都道府県を選択してください</h3>
+      <div class="checkbox-container">
+        <div v-for="pref in finalData" :key="pref.prefCode">
+          <label>
+            <input
+              type="checkbox"
+              :value="pref.prefCode"
+              @change="togglePrefecture(pref)"
+            />
+            {{ pref.prefName }}
+          </label>
+        </div>
       </div>
 
+      <h3>人口の種類を選択してください</h3>
       <div class="buttons">
         <button
           v-for="type in populationTypes"
@@ -75,7 +78,7 @@ export default defineComponent({
         type: 'line',
       },
       title: {
-        text: 'Population Trends',
+        text: '人口推移',
       },
       xAxis: {
         title: {
@@ -227,6 +230,13 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.checkbox-container {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 30px;
+}
 .buttons {
   margin-bottom: 20px;
 }
@@ -234,7 +244,8 @@ export default defineComponent({
 button {
   margin-right: 10px;
   padding: 5px 10px;
-  border: 1px solid #ccc;
+  border: none;
+  border-radius: 5px;
   background-color: #f9f9f9;
   cursor: pointer;
 }
